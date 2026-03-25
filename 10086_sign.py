@@ -202,7 +202,7 @@ def coin_park(cookie_str, index):
 # ======================= 主入口 =======================
 def main():
     log("=" * 50)
-    log("中国移动签到脚本 v2.1")
+    log("中国移动签到脚本 v2.2")
     log(f"执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     log("=" * 50)
 
