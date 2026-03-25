@@ -60,7 +60,7 @@ def sign_in_gift(cookie_str, index):
     """
     河南移动 - 签到赢好礼
     Step 1: POST /h5-act/signIn/init   → 初始化/查询签到状态
-    Step 2: POST /h5-act/signIn/signIn → 执行签到动作
+    Step 2: POST /h5-act/signIn/click  → 执行签到动作
     """
     log(f"--- 账号 {index} [签到赢好礼] ---")
 
@@ -83,7 +83,7 @@ def sign_in_gift(cookie_str, index):
     if auth_value:
         headers["Authorization"] = auth_value
 
-    payload = {
+    payload_init = {
         "channel": "channel_WD",
         "recommend": "",
         "optno": "",
@@ -92,11 +92,14 @@ def sign_in_gift(cookie_str, index):
         "appId": ""
     }
 
+    payload_click = payload_init.copy()
+    payload_click["taskId"] = ""  # click 请求多了一个空 taskId
+
     try:
         with httpx.Client(verify=SSL_CTX, timeout=15) as client:
             # Step 1: 初始化，检查今日是否已签到
             init_url = "https://wap.ha.10086.cn/h5-act/signIn/init"
-            resp = client.post(init_url, headers=headers, json=payload)
+            resp = client.post(init_url, headers=headers, json=payload_init)
             data = resp.json()
             inner = data.get("data", {}) or {}
             code = inner.get("code")
@@ -106,24 +109,30 @@ def sign_in_gift(cookie_str, index):
                 sign_num = inner.get("signNum", "?")
                 log(f"  ℹ️ 今日已签到, 本月累计 {sign_num} 天")
                 return
+            elif data.get("code") == "1" and code == "10" and str(sign_today) == "0":
+                log("  [DEBUG] 检测到未签到，准备执行签到...")
+            else:
+                log(f"  ❌ 初始化异常返回: {resp.text[:300]}")
+                return
 
             # Step 2: 执行签到动作
-            sign_url = "https://wap.ha.10086.cn/h5-act/signIn/signIn"
+            sign_url = "https://wap.ha.10086.cn/h5-act/signIn/click"
             time.sleep(uniform(0.5, 1.5))
-            resp2 = client.post(sign_url, headers=headers, json=payload)
+            resp2 = client.post(sign_url, headers=headers, json=payload_click)
             data2 = resp2.json()
             inner2 = data2.get("data", {}) or {}
             code2 = inner2.get("code")
 
             if data2.get("code") == "1" and code2 == "10":
                 sign_num = inner2.get("signNum", "?")
-                log(f"  ✅ 签到成功! 本月累计签到 {sign_num} 天")
+                prize = inner2.get("prizeName", "未知奖品")
+                log(f"  ✅ 签到成功! 本月累计 {sign_num} 天, 获得: {prize}")
             elif data2.get("code") == "1" and code2 == "11":
                 log(f"  ℹ️ 今日已签到")
             elif data2.get("code") == "0" and "已" in data2.get("msg", ""):
                 log(f"  ℹ️ {data2.get('msg', '今日已签到')}")
             else:
-                log(f"  ❌ 签到返回: {resp2.text[:300]}")
+                log(f"  ❌ 签到失败: {resp2.text[:300]}")
     except Exception as e:
         log(f"  ❌ 请求出错: {e}")
 
